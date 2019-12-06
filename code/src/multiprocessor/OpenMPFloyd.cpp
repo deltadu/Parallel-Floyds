@@ -33,51 +33,53 @@ int main(int argc, char* argv[]) {
     parallelFloyd(graph);
     double OpenMPTime = t.elapsed();
 
-    cout << "Result is:" << endl;
-    print_result(graph);
+    // cout << "Result is:" << endl;
+    // print_result(graph);
     cout << "Time taken: " << OpenMPTime << endl;
-	return 0;
+    return 0;
 }
 
 void parallelFloyd(Graph& graph) {
-	int numVertices = graph.getNumVertices();
-	int sqrtOfnumberThreads = sqrt(omp_get_max_threads());
-	int blockSize = numVertices / sqrtOfnumberThreads;
-	vector<int> rowK(numVertices);
-	vector<int> colK(numVertices);
-	int minlen;
+    int numVertices = graph.getNumVertices();
+    int sqrtOfnumberThreads = sqrt(omp_get_max_threads());
+    int blockSize = numVertices / sqrtOfnumberThreads;
+    vector<int> rowK(numVertices);
+    vector<int> colK(numVertices);
+    int minlen;
+    int i, j, k;
+    int distItoK, distItoKtoJ;
+    int startRow, lastRow, startCol, lastCol;
+    int threadNumber;
 
-#pragma omp parallel shared(                                      \
-    graph, numVertices, sqrtOfnumberThreads,            \
-    blockSize) firstprivate(rowK, colK)
+#pragma omp parallel shared(graph, numVertices, sqrtOfnumberThreads, blockSize) private(i, j, k, startRow, lastRow, startCol, lastCol, distItoKtoJ, distItoK, threadNumber) firstprivate(rowK, colK)
         {
-		int threadNumber = omp_get_thread_num();
+        threadNumber = omp_get_thread_num();
 
-		int startRow = (threadNumber / sqrtOfnumberThreads) * blockSize;
-		int lastRow = startRow + blockSize;
+        startRow = (threadNumber / sqrtOfnumberThreads) * blockSize;
+        lastRow = startRow + blockSize;
 
-		int startCol = (threadNumber % sqrtOfnumberThreads) * blockSize;
-		int lastCol = startCol + blockSize;
+        startCol = (threadNumber % sqrtOfnumberThreads) * blockSize;
+        lastCol = startCol + blockSize;
 
-		for (int k = 0; k < numVertices; k++) {
-			#pragma omp barrier
-			for (int i = 0; i < numVertices; ++i) {
-				rowK[i] = graph.getDist(k, i);
-				colK[i] = graph.getDist(i, k);
-			}
-			#pragma omp barrier
-			for (int i = startRow; i < lastRow; ++i) {
-				int distItoK = colK[i];
-				for (int j = startCol; j < lastCol; ++j) {
-					if (i != j && i != k && j != k) {
-						int distItoKtoJ = distItoK + rowK[j];
-						minlen = min(distItoKtoJ, graph.getDist(i, j));
-						graph.setDist(i, j, minlen);
-					}
-				}
-			}
-		}
-	}
+        for (k = 0; k < numVertices; k++) {
+            #pragma omp barrier
+            for (i = 0; i < numVertices; ++i) {
+                rowK[i] = graph.getDist(k, i);
+                colK[i] = graph.getDist(i, k);
+            }
+            #pragma omp barrier
+            for (i = startRow; i < lastRow; ++i) {
+                distItoK = colK[i];
+                for (j = startCol; j < lastCol; ++j) {
+                    if (i != j && i != k && j != k) {
+                        distItoKtoJ = distItoK + rowK[j];
+                        minlen = min(distItoKtoJ, graph.getDist(i, j));
+                        graph.setDist(i, j, minlen);
+                    }
+                }
+            }
+        }
+    }
 }
 
 void print_result(Graph& graph) {
