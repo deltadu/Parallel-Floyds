@@ -8,10 +8,8 @@
 #include "../timing.h"
 using namespace std;
 
-void parallelFloyd(Graph& graph, const int n, const int b);
+void parallelFloyd(Graph& graph, int n, int b);
 void print_result(Graph& graph);
-
-// extern "C" void helper_ispc(Graph& graph, int ar, int ac, int br, int bc, int cr, int cc, const int b, const int n);
 
 #define BLOCK_SIZE 64
 
@@ -41,7 +39,7 @@ int main(int argc, char* argv[]) {
 }
 
 
-inline void helper(Graph& graph, int ar, int ac, int br, int bc, int cr, int cc, const int b, const int n) {
+inline void helper(Graph& graph, int ar, int ac, int br, int bc, int cr, int cc, int b, int n) {
     for (int k = 0; k < b; k++) {
         for (int i = 0; i < b; i++) {
             for (int j = 0; j < b; j++) {
@@ -56,25 +54,29 @@ inline void helper(Graph& graph, int ar, int ac, int br, int bc, int cr, int cc,
 }
 
 
-void parallelFloyd(Graph& graph, const int n, const int b) {
-    const int blocks = n / b;
+void parallelFloyd(Graph& graph, int vertices_num, int block_size) {
+    int block_num = vertices_num / block_size;
 
-    for (int k = 0; k < blocks; k++) {
-        helper(graph, k*b, k*b, k*b, k*b, k*b, k*b, b, n);
+    for (int k = 0; k < block_num; k++) {
+        helper(graph, k*block_size, k*block_size, k*block_size, k*block_size,
+               k*block_size, k*block_size, block_size, vertices_num);
 
         #pragma omp parallel for
-        for (int j = 0; j < blocks; j++) {
+        for (int j = 0; j < block_num; j++) {
             if (j == k) continue;
-            helper(graph, k*b, j*b, k*b, k*b, k*b, j*b, b, n);
+            helper(graph, k*block_size, j*block_size, k*block_size,
+                   k*block_size, k*block_size, j*block_size, block_size, vertices_num);
         }
 
         #pragma omp parallel for
-        for (int i = 0; i < blocks; i++) {
+        for (int i = 0; i < block_num; i++) {
             if (i == k) continue;
-            helper(graph, i*b, k*b, i*b, k*b, k*b, k*b, b, n);
-            for (int j = 0; j < blocks; j++) {
+            helper(graph, i*block_size, k*block_size, i*block_size,
+                   k*block_size, k*block_size, k*block_size, block_size, vertices_num);
+            for (int j = 0; j < block_num; j++) {
                 if (j == k) continue;
-                helper(graph, i*b, j*b, i*b, k*b, k*b, j*b, b, n);
+                helper(graph, i*block_size, j*block_size, i*block_size,
+                       k*block_size, k*block_size, j*block_size, block_size, vertices_num);
             }
         }
     }
